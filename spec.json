@@ -1,0 +1,162 @@
+{
+  "meta": {
+    "name": "Snake",
+    "version": "1.0.0",
+    "description": "Classic snake game — eat food, grow longer, don't hit yourself"
+  },
+
+  "config": {
+    "display": {
+      "type": "grid",
+      "width": 20,
+      "height": 20,
+      "cellSize": 25,
+      "background": "#111"
+    },
+    "timing": {
+      "tickRate": 150,
+      "accelerates": true,
+      "accelerationFactor": 5,
+      "accelerationPer": "state.level",
+      "minTickRate": 60
+    },
+    "input": {
+      "up":      { "keys": ["ArrowUp", "w"] },
+      "down":    { "keys": ["ArrowDown", "s"] },
+      "left":    { "keys": ["ArrowLeft", "a"] },
+      "right":   { "keys": ["ArrowRight", "d"] },
+      "restart": { "keys": ["r", "R"] }
+    }
+  },
+
+  "componentTypes": {
+    "Position": {
+      "fields": {
+        "x": { "type": "int", "default": 0 },
+        "y": { "type": "int", "default": 0 }
+      }
+    },
+    "Velocity": {
+      "fields": {
+        "dx": { "type": "int", "default": 1 },
+        "dy": { "type": "int", "default": 0 }
+      }
+    },
+    "Wraps": { "fields": {} },
+    "SnakeBody": {
+      "fields": {
+        "segments": { "type": "vec2[]" },
+        "growing": { "type": "bool", "default": false },
+        "headColor": { "type": "color", "default": "#0f0" },
+        "bodyColor": { "type": "color", "default": "#0a0" }
+      }
+    },
+    "Food": {
+      "fields": {
+        "color": { "type": "color", "default": "#f00" }
+      }
+    }
+  },
+
+  "archetypes": {
+    "snake": {
+      "singleton": true,
+      "components": {
+        "Position": { "x": 10, "y": 10 },
+        "Velocity": { "dx": 1, "dy": 0 },
+        "Wraps": {},
+        "SnakeBody": {
+          "segments": [[9, 10], [8, 10]],
+          "growing": false,
+          "headColor": "#0f0",
+          "bodyColor": "#0a0"
+        }
+      }
+    },
+    "food": {
+      "singleton": true,
+      "components": {
+        "Position": { "x": 15, "y": 10 },
+        "Food": { "color": "#f00" }
+      }
+    }
+  },
+
+  "resources": {
+    "state": {
+      "score": 0,
+      "level": 1,
+      "gameOver": false
+    }
+  },
+
+  "systems": [
+    {
+      "name": "input",
+      "type": "input",
+      "config": {
+        "target": "snake",
+        "directions": {
+          "up":    [0, -1],
+          "down":  [0, 1],
+          "left":  [-1, 0],
+          "right": [1, 0]
+        },
+        "preventReverse": true
+      }
+    },
+    {
+      "name": "grow",
+      "type": "grow",
+      "config": {}
+    },
+    {
+      "name": "movement",
+      "type": "movement",
+      "config": {}
+    },
+    {
+      "name": "wrap",
+      "type": "wrap",
+      "config": {}
+    },
+    {
+      "name": "collision",
+      "type": "collision",
+      "config": {
+        "selfCollision": true
+      }
+    },
+    {
+      "name": "consume",
+      "type": "consume",
+      "config": {
+        "scorePerConsume": 10
+      }
+    },
+    {
+      "name": "levelUp",
+      "type": "levelUp",
+      "on": "consumed",
+      "config": {
+        "resource": "state",
+        "linesPerLevel": 5,
+        "linesField": "score",
+        "levelFromScore": true,
+        "scorePerLevel": 50
+      }
+    },
+    {
+      "name": "render",
+      "type": "render",
+      "config": {
+        "layers": [
+          { "type": "food", "component": "Food" },
+          { "type": "body", "component": "SnakeBody" },
+          { "type": "hud", "fields": ["score"], "fontSize": 16 },
+          { "type": "gameOver" }
+        ]
+      }
+    }
+  ]
+}
