@@ -153,6 +153,91 @@ game.system('input', function inputSystem(world, _dt) {
   }
 });
 
+// ── AI Auto-Play System ─────────────────────────────────────────────
+
+game.system('ai', function aiSystem(world, _dt) {
+  const state = world.getResource('state');
+  if (state.gameOver) return;
+
+  const snakes = world.query('Snake');
+  if (snakes.length === 0) return;
+
+  const snake = world.getComponent(snakes[0], 'Snake');
+  const foods = world.query('Food', 'Position');
+  if (foods.length === 0) return;
+
+  const foodPos = world.getComponent(foods[0], 'Position');
+  const head = snake.segments[0];
+  const pending = world.getResource('_pendingDir');
+
+  // Build occupancy set from snake body (excluding tail which will move)
+  const bodySet = new Set();
+  for (let i = 0; i < snake.segments.length - 1; i++) {
+    bodySet.add(`${snake.segments[i].x},${snake.segments[i].y}`);
+  }
+
+  // Try BFS to find path to food
+  const dir = bfsDirection(head, foodPos, snake.dx, snake.dy, bodySet);
+  if (dir && (dir.dx !== snake.dx || dir.dy !== snake.dy)) {
+    // Prevent 180 reversal
+    if (dir.dx !== -snake.dx || dir.dy !== -snake.dy) {
+      pending.dx = dir.dx;
+      pending.dy = dir.dy;
+    }
+  }
+});
+
+function bfsDirection(head, target, curDx, curDy, bodySet) {
+  // Simple BFS on wrapping grid to find shortest path to food
+  const dirs = [
+    { dx: 0, dy: -1 }, // up
+    { dx: 0, dy: 1 },  // down
+    { dx: -1, dy: 0 }, // left
+    { dx: 1, dy: 0 },  // right
+  ];
+
+  const visited = new Set();
+  visited.add(`${head.x},${head.y}`);
+  const queue = [];
+
+  // Start with valid first moves (no 180 reversal)
+  for (const d of dirs) {
+    if (d.dx === -curDx && d.dy === -curDy) continue; // skip reversal
+    const nx = ((head.x + d.dx) % COLS + COLS) % COLS;
+    const ny = ((head.y + d.dy) % ROWS + ROWS) % ROWS;
+    const key = `${nx},${ny}`;
+    if (bodySet.has(key)) continue;
+    if (nx === target.x && ny === target.y) return d;
+    visited.add(key);
+    queue.push({ x: nx, y: ny, firstDir: d });
+  }
+
+  // BFS up to limited depth for performance
+  let limit = 200;
+  while (queue.length > 0 && limit-- > 0) {
+    const cur = queue.shift();
+    for (const d of dirs) {
+      const nx = ((cur.x + d.dx) % COLS + COLS) % COLS;
+      const ny = ((cur.y + d.dy) % ROWS + ROWS) % ROWS;
+      const key = `${nx},${ny}`;
+      if (visited.has(key) || bodySet.has(key)) continue;
+      if (nx === target.x && ny === target.y) return cur.firstDir;
+      visited.add(key);
+      queue.push({ x: nx, y: ny, firstDir: cur.firstDir });
+    }
+  }
+
+  // Fallback: pick any safe direction
+  for (const d of dirs) {
+    if (d.dx === -curDx && d.dy === -curDy) continue;
+    const nx = ((head.x + d.dx) % COLS + COLS) % COLS;
+    const ny = ((head.y + d.dy) % ROWS + ROWS) % ROWS;
+    if (!bodySet.has(`${nx},${ny}`)) return d;
+  }
+
+  return null; // No safe move
+}
+
 // ── Movement System ─────────────────────────────────────────────────
 
 function getTickInterval(level) {
